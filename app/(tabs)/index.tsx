@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-const API_URL = 'https://nonsuppressed-marybelle-sleekly.ngrok-free.dev/api/trip/latest/';
+import { API_BASE_URL } from '@/constants/api';
+const API_URL = `${API_BASE_URL}/api/trip/latest/`;
 
 type Event = {
   id: number;
