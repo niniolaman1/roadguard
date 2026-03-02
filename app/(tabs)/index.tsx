@@ -1,98 +1,264 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+const API_URL = 'https://nonsuppressed-marybelle-sleekly.ngrok-free.dev/api/trip/latest/';
+
+type Event = {
+  id: number;
+  timestamp: string;
+  severity: 'low' | 'medium' | 'high';
+  duration: number;
+};
+
+type Trip = {
+  id: number;
+  start_time: string;
+  end_time: string;
+  duration: string;
+  events: Event[];
+};
+
+const severityColor = (severity: string) => {
+  if (severity === 'high') return '#FF3B30';
+  if (severity === 'medium') return '#FF9500';
+  return '#FFD60A';
+};
+
+const severityBg = (severity: string) => {
+  if (severity === 'high') return '#2C1010';
+  if (severity === 'medium') return '#2C1E00';
+  return '#2C2600';
+};
+
+const formatTime = (iso: string) => {
+  const date = new Date(iso);
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+const formatDate = (iso: string) => {
+  const date = new Date(iso);
+  return date.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+};
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const [trip, setTrip] = useState<Trip | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  useEffect(() => {
+    fetch(API_URL)
+      .then(res => {
+        if (!res.ok) throw new Error('No trips recorded yet');
+        return res.json();
+      })
+      .then(data => {
+        setTrip(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="white" />
+        <Text style={styles.loadingText}>Fetching trip data...</Text>
+      </View>
+    );
+  }
+
+  if (error || !trip) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorEmoji}>🚗</Text>
+        <Text style={styles.errorText}>No trips recorded yet</Text>
+        <Text style={styles.errorSub}>Complete a drive to see your summary</Text>
+      </View>
+    );
+  }
+
+  const severityCounts = { low: 0, medium: 0, high: 0 };
+  trip.events.forEach(e => severityCounts[e.severity]++);
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+
+      <Text style={styles.heading}>RoadGuard</Text>
+      <Text style={styles.subheading}>Latest Trip Summary</Text>
+
+      {/* Trip Info Card */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>📅  {formatDate(trip.start_time)}</Text>
+        <View style={styles.row}>
+          <View style={styles.infoBlock}>
+            <Text style={styles.infoLabel}>Start</Text>
+            <Text style={styles.infoValue}>{formatTime(trip.start_time)}</Text>
+          </View>
+          <View style={styles.infoBlock}>
+            <Text style={styles.infoLabel}>End</Text>
+            <Text style={styles.infoValue}>{formatTime(trip.end_time)}</Text>
+          </View>
+          <View style={styles.infoBlock}>
+            <Text style={styles.infoLabel}>Duration</Text>
+            <Text style={styles.infoValue}>{trip.duration}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Events Summary Card */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>⚠️  Drowsiness Events</Text>
+        <Text style={styles.bigNumber}>{trip.events.length}</Text>
+        <View style={styles.row}>
+          {(['low', 'medium', 'high'] as const).map(s => (
+            <View key={s} style={[styles.pill, { borderColor: severityColor(s), backgroundColor: severityBg(s) }]}>
+              <Text style={[styles.pillText, { color: severityColor(s) }]}>
+                {severityCounts[s]} {s.charAt(0).toUpperCase() + s.slice(1)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Timeline */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>🕐  Event Timeline</Text>
+        {trip.events.map((event) => (
+          <View key={event.id} style={styles.timelineItem}>
+            <View style={[styles.timelineDot, { backgroundColor: severityColor(event.severity) }]} />
+            <View style={styles.timelineContent}>
+              <Text style={styles.timelineTime}>{formatTime(event.timestamp)}</Text>
+              <Text style={styles.timelineDesc}>Eyes closed for {event.duration}s</Text>
+              <View style={[styles.pill, { borderColor: severityColor(event.severity), backgroundColor: severityBg(event.severity) }]}>
+                <Text style={[styles.pillText, { color: severityColor(event.severity) }]}>
+                  {event.severity.charAt(0).toUpperCase() + event.severity.slice(1)}
+                </Text>
+              </View>
+            </View>
+          </View>
+        ))}
+      </View>
+
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: '#0D0D0D',
   },
-  stepContainer: {
-    gap: 8,
+  content: {
+    padding: 20,
+    paddingTop: 60,
+    gap: 16,
+  },
+  centered: {
+    flex: 1,
+    backgroundColor: '#0D0D0D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  heading: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  subheading: {
+    fontSize: 14,
+    color: '#888',
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  card: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 16,
+    padding: 20,
+    gap: 12,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#AEAEB2',
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  infoBlock: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: '#2C2C2E',
+    borderRadius: 12,
+    padding: 12,
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 4,
+  },
+  infoValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+  },
+  bigNumber: {
+    fontSize: 56,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  pill: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  pillText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  timelineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  timelineContent: {
+    flex: 1,
+    gap: 6,
+  },
+  timelineTime: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'white',
+  },
+  timelineDesc: {
+    fontSize: 13,
+    color: '#888',
+  },
+  loadingText: {
+    color: '#888',
+    marginTop: 12,
+  },
+  errorEmoji: {
+    fontSize: 60,
+  },
+  errorText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  errorSub: {
+    fontSize: 14,
+    color: '#888',
   },
 });
