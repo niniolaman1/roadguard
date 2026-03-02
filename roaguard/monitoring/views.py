@@ -15,3 +15,8 @@ def latest_trip(request):
             {'message': 'No trips recorded yet'},
             status=status.HTTP_404_NOT_FOUND
         )
+@api_view(['GET'])
+def all_trips(request):
+    trips = Trip.objects.prefetch_related('events').order_by('-start_time')
+    serializer = TripSerializer(trips, many=True)
+    return Response(serializer.data)
